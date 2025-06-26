@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Token } from '@/lib/tokens'
 import { getUniswapPrice, formatPrice, type PriceResult } from '@/lib/uniswap'
 import { getSushiPrice, calculatePriceDifference, type SushiPriceResult } from '@/lib/sushiswap'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, TrendingUp, ExternalLink, ArrowUpDown } from 'lucide-react'
+import { Loader2, TrendingUp, ExternalLink, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useAccount } from 'wagmi'
 
 interface PriceDisplayProps {
@@ -19,44 +20,62 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
   const [sushiData, setSushiData] = useState<SushiPriceResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const { chain } = useAccount()
 
-  useEffect(() => {
-    const fetchPrices = async () => {
-      if (!tokenA || !tokenB) return
+  const fetchPrices = useCallback(async () => {
+    if (!tokenA || !tokenB) return
 
-      setLoading(true)
-      setError(null)
+    setLoading(true)
+    setError(null)
 
-      try {
-        const chainId = chain?.id || 1 // Default to Ethereum mainnet
-        
-        // Fetch both prices in parallel
-        const [uniResult, sushiResult] = await Promise.all([
-          getUniswapPrice(tokenA, tokenB, chainId),
-          getSushiPrice(tokenA, tokenB)
-        ])
-        
-        if (uniResult) {
-          setUniswapData(uniResult)
-        }
-        
-        if (sushiResult) {
-          setSushiData(sushiResult)
-        }
-
-        if (!uniResult && !sushiResult) {
-          setError('No active pools found for this pair on any DEX')
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch prices')
-      } finally {
-        setLoading(false)
+    try {
+      const chainId = chain?.id || 1 // Default to Ethereum mainnet
+      
+      // Fetch both prices in parallel
+      const [uniResult, sushiResult] = await Promise.all([
+        getUniswapPrice(tokenA, tokenB, chainId),
+        getSushiPrice(tokenA, tokenB)
+      ])
+      
+      if (uniResult) {
+        setUniswapData(uniResult)
+      } else {
+        setUniswapData(null)
       }
-    }
+      
+      if (sushiResult) {
+        setSushiData(sushiResult)
+      } else {
+        setSushiData(null)
+      }
 
-    fetchPrices()
+      if (!uniResult && !sushiResult) {
+        setError('No active pools found for this pair on any DEX')
+      }
+      
+      setLastUpdated(new Date())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch prices')
+    } finally {
+      setLoading(false)
+    }
   }, [tokenA, tokenB, chain])
+
+  useEffect(() => {
+    fetchPrices()
+  }, [fetchPrices])
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    if (!tokenA || !tokenB) return
+
+    const interval = setInterval(() => {
+      fetchPrices()
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [fetchPrices, tokenA, tokenB])
 
   const getFeeLabel = (fee: number) => {
     switch (fee) {
@@ -72,13 +91,23 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
     ? calculatePriceDifference(uniswapData.price, sushiData.price)
     : null
 
-  if (loading) {
+  if (loading && !uniswapData && !sushiData) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            DEX Prices
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              DEX Prices
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchPrices}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -111,15 +140,32 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
 
   return (
     <div className="space-y-6">
-      {/* Price Comparison */}
-      {priceDiff && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ArrowUpDown className="h-5 w-5" />
-              Price Comparison
-            </CardTitle>
-          </CardHeader>
+      {/* Header with Refresh Button */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              DEX Prices
+              {lastUpdated && (
+                <span className="text-sm text-muted-foreground font-normal">
+                  (Updated {lastUpdated.toLocaleTimeString()})
+                </span>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchPrices}
+              disabled={loading}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        {priceDiff && (
           <CardContent>
             <div className="text-center space-y-2">
               <p className="text-2xl font-bold">
@@ -142,16 +188,23 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
               </div>
             </div>
           </CardContent>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Uniswap Price */}
       {uniswapData && (
-        <Card>
+        <Card className={`${priceDiff?.better === 'uniswap' ? 'border-green-500 border-2 bg-green-50/50 dark:bg-green-950/20' : ''}`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Uniswap V3 Price
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Uniswap V3 Price
+                {priceDiff?.better === 'uniswap' && (
+                  <Badge className="bg-green-500 hover:bg-green-600">
+                    BEST PRICE
+                  </Badge>
+                )}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -200,11 +253,18 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
 
       {/* SushiSwap Price */}
       {sushiData && (
-        <Card>
+        <Card className={`${priceDiff?.better === 'sushiswap' ? 'border-green-500 border-2 bg-green-50/50 dark:bg-green-950/20' : ''}`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              SushiSwap Price
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                SushiSwap Price
+                {priceDiff?.better === 'sushiswap' && (
+                  <Badge className="bg-green-500 hover:bg-green-600">
+                    BEST PRICE
+                  </Badge>
+                )}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
