@@ -21,7 +21,12 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const { chain } = useAccount()
+  const [mounted, setMounted] = useState(false)
+  useAccount() // For wallet connection context
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const fetchPrices = useCallback(async () => {
     if (!tokenA || !tokenB) return
@@ -29,12 +34,10 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
     setLoading(true)
     setError(null)
 
-    try {
-      const chainId = chain?.id || 1 // Default to Ethereum mainnet
-      
+    try {      
       // Fetch both prices in parallel
       const [uniResult, sushiResult] = await Promise.all([
-        getUniswapPrice(tokenA, tokenB, chainId),
+        getUniswapPrice(tokenA, tokenB),
         getSushiPrice(tokenA, tokenB)
       ])
       
@@ -60,7 +63,7 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
     } finally {
       setLoading(false)
     }
-  }, [tokenA, tokenB, chain])
+  }, [tokenA, tokenB])
 
   useEffect(() => {
     fetchPrices()
@@ -147,9 +150,14 @@ export function PriceDisplay({ tokenA, tokenB }: PriceDisplayProps) {
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
               DEX Prices
-              {lastUpdated && (
+              {mounted && lastUpdated && (
                 <span className="text-sm text-muted-foreground font-normal">
-                  (Updated {lastUpdated.toLocaleTimeString()})
+                  (Updated {lastUpdated.toLocaleTimeString('en-US', { 
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })})
                 </span>
               )}
             </div>

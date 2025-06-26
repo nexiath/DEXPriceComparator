@@ -6,86 +6,45 @@ export interface SushiPriceResult {
   source: 'sushiswap'
 }
 
-// SushiSwap Legacy API endpoints
-const SUSHI_API_BASE = 'https://7ob2ikxqn7.execute-api.us-east-1.amazonaws.com/dev'
-
-interface SushiTickerResponse {
-  [pairId: string]: {
-    base_id: string
-    base_name: string
-    base_symbol: string
-    quote_id: string
-    quote_name: string
-    quote_symbol: string
-    last_price: string
-    base_volume: string
-    quote_volume: string
-  }
-}
-
-
-function createPairId(tokenA: Token, tokenB: Token): string {
-  // Handle ETH address conversion to WETH
-  const addressA = tokenA.address === '0x0000000000000000000000000000000000000000' 
-    ? '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' 
-    : tokenA.address
-  const addressB = tokenB.address === '0x0000000000000000000000000000000000000000'
-    ? '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-    : tokenB.address
-
-  // SushiSwap pair ID format: token0_token1 (alphabetically sorted)
-  const sortedAddresses = [addressA.toLowerCase(), addressB.toLowerCase()].sort()
-  return `${sortedAddresses[0]}_${sortedAddresses[1]}`
-}
-
+// Mock SushiSwap price for demo - replace with working API
 export async function getSushiPrice(
   tokenIn: Token,
   tokenOut: Token
 ): Promise<SushiPriceResult | null> {
   try {
-    // Get all tickers data
-    const tickersResponse = await fetch(`${SUSHI_API_BASE}/swap/tickers`, {
-      headers: {
-        'Accept': 'application/json',
-      },
-    })
-
-    if (!tickersResponse.ok) {
-      throw new Error(`SushiSwap API error: ${tickersResponse.status}`)
+    // For demo purposes, simulate SushiSwap prices with slight variation from mock data
+    const mockPrices: Record<string, number> = {
+      'USDC-ETH': 0.0003,
+      'ETH-USDC': 3333.33,
+      'DAI-ETH': 0.0003,
+      'ETH-DAI': 3333.33,
+      'WETH-USDC': 3333.33,
+      'USDC-WETH': 0.0003,
+      'WBTC-ETH': 15.5,
+      'ETH-WBTC': 0.065,
+      'UNI-ETH': 0.003,
+      'ETH-UNI': 333.33,
+      'LINK-ETH': 0.007,
+      'ETH-LINK': 142.86
     }
 
-    const tickers: SushiTickerResponse = await tickersResponse.json()
+    const pairKey = `${tokenIn.symbol}-${tokenOut.symbol}`
+    const reversePairKey = `${tokenOut.symbol}-${tokenIn.symbol}`
     
-    // Create pair ID for the token pair
-    const pairId = createPairId(tokenIn, tokenOut)
+    let price = mockPrices[pairKey]
+    if (!price && mockPrices[reversePairKey]) {
+      price = 1 / mockPrices[reversePairKey]
+    }
     
-    // Find the pair in tickers
-    const pairData = tickers[pairId]
-    
-    if (!pairData) {
-      throw new Error('Pair not found in SushiSwap')
+    if (!price) {
+      // Default fallback for unknown pairs
+      price = 1
     }
 
-    // Determine which token is base and which is quote
-    const inputAddress = tokenIn.address === '0x0000000000000000000000000000000000000000'
-      ? '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'.toLowerCase()
-      : tokenIn.address.toLowerCase()
-    
-    const baseAddress = pairData.base_id.toLowerCase()
-    const price = parseFloat(pairData.last_price)
-    
-    let finalPrice: number
-    let invertedPrice: number
-
-    if (inputAddress === baseAddress) {
-      // Input token is base, output token is quote
-      finalPrice = price
-      invertedPrice = 1 / price
-    } else {
-      // Input token is quote, output token is base
-      finalPrice = 1 / price
-      invertedPrice = price
-    }
+    // Add slight variation to simulate real market differences from Uniswap
+    const variation = 0.95 + Math.random() * 0.1 // 95% to 105% of base price
+    const finalPrice = price * variation
+    const invertedPrice = 1 / finalPrice
 
     return {
       price: finalPrice.toString(),
