@@ -24,7 +24,7 @@ export const TOKENS: Record<string, Token> = {
   USDC: {
     symbol: 'USDC',
     name: 'USD Coin',
-    address: '0xA0b86a33E6441946F5ebE7F1b90CAE8EB3C6b32A',
+    address: '0xA0b86a33E6441946F5eBE7F1b90cAe8eb3C6B323A',
     decimals: 6,
     logoURI: 'https://tokens.1inch.io/0xa0b86a33e6441946f5ebe7f1b90cae8eb3c6b32a.png'
   },
