@@ -1,4 +1,5 @@
 import { WalletConnect } from '@/components/wallet-connect'
+import { TokenSelection } from '@/components/token-selection'
 
 export default function Home() {
   return (
@@ -50,16 +51,20 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-12 text-center">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-              <h3 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">
-                Ready to Start Trading?
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
-                Connect your wallet to access real-time DEX price comparisons
-              </p>
-              <div className="flex justify-center">
-                <WalletConnect />
+          <div className="mt-12 space-y-8">
+            <TokenSelection />
+            
+            <div className="text-center">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+                <h3 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">
+                  Ready to Start Trading?
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Connect your wallet to access real-time DEX price comparisons
+                </p>
+                <div className="flex justify-center">
+                  <WalletConnect />
+                </div>
               </div>
             </div>
           </div>
